@@ -1,20 +1,27 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { MessageCircle, Triangle } from 'lucide-react';
+import { MessageCircle, Triangle, ExternalLink } from 'lucide-react';
+
+type Citation = {
+  title: string;
+  uri: string;
+};
 
 type ChatMessageProps = {
   content: string;
   isUser?: boolean;
   isLoading?: boolean;
   showIcon?: boolean;
+  citations?: Citation[];
 };
 
 const ChatMessage: React.FC<ChatMessageProps> = ({
   content,
   isUser = false,
   isLoading = false,
-  showIcon = true
+  showIcon = true,
+  citations = []
 }) => {
   return (
     <div
@@ -44,7 +51,30 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
             <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse delay-150"></div>
           </div>
         ) : (
-          <div className="whitespace-pre-wrap">{content}</div>
+          <div className="flex flex-col">
+            <div className="whitespace-pre-wrap">{content}</div>
+            
+            {citations && citations.length > 0 && (
+              <div className="mt-3 pt-3 border-t border-gray-700">
+                <p className="text-xs text-gray-400 mb-2">Sources:</p>
+                <ul className="list-disc list-inside text-xs space-y-1">
+                  {citations.map((citation, index) => (
+                    <li key={index} className="flex items-center text-blue-400 hover:underline">
+                      <a 
+                        href={citation.uri} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center"
+                      >
+                        {citation.title}
+                        <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
