@@ -1,7 +1,7 @@
 
 # AI Chatbot Application
 
-This project consists of a React-based frontend chatbot UI and a Python FastAPI backend that connects to Gemini AI on Google Vertex AI.
+This project consists of a React-based frontend chatbot UI and a Python FastAPI backend.
 
 ## Project Structure
 
@@ -52,9 +52,15 @@ This project consists of a React-based frontend chatbot UI and a Python FastAPI 
 
    The API will be available at [http://localhost:8000](http://localhost:8000)
 
+## Important Notes
+
+- The frontend chatbot communicates with the backend at `http://localhost:8000/api/chat`
+- Both the frontend and backend must be running simultaneously for the chatbot to work
+- The backend is currently using mock responses, but can be extended to use Gemini AI
+
 ## Implementing Gemini AI
 
-The current implementation uses mock responses. To implement the actual Gemini AI with Vertex AI:
+To implement the actual Gemini AI with Vertex AI:
 
 1. Install additional dependencies:
    ```
@@ -64,6 +70,15 @@ The current implementation uses mock responses. To implement the actual Gemini A
 2. Set up a Google Cloud project and enable the Vertex AI API
 3. Set up authentication with a service account key
 4. Update the code in `backend/app.py` to use the actual Vertex AI client
+
+## Troubleshooting
+
+If you see "Failed to get a response from the AI" error:
+
+1. Make sure the backend server is running at http://localhost:8000
+2. Check if there are any error messages in the backend console
+3. Verify network connectivity between frontend and backend
+4. If using a virtual environment, ensure all required packages are installed
 
 ## Features
 
@@ -77,4 +92,3 @@ The current implementation uses mock responses. To implement the actual Gemini A
 
 - Frontend: React, TypeScript, Tailwind CSS
 - Backend: FastAPI, Python
-- AI: Google Vertex AI (Gemini)

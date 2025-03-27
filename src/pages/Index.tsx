@@ -39,8 +39,31 @@ const API_URL = "http://localhost:8000/api/chat";
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isApiAvailable, setIsApiAvailable] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Check if API is available on component mount
+  useEffect(() => {
+    const checkApiStatus = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/');
+        if (response.ok) {
+          setIsApiAvailable(true);
+          console.log('Backend API is available');
+        } else {
+          setIsApiAvailable(false);
+          toast.error('Backend service is not responding properly');
+        }
+      } catch (error) {
+        console.error('Backend API check failed:', error);
+        setIsApiAvailable(false);
+        toast.error('Cannot connect to backend service. Make sure it\'s running on http://localhost:8000');
+      }
+    };
+    
+    checkApiStatus();
+  }, []);
   
   // Auto scroll to bottom when messages change
   useEffect(() => {
@@ -48,7 +71,16 @@ const Index = () => {
   }, [messages, isTyping]);
 
   const sendMessageToAPI = async (userMessage: string) => {
+    if (!isApiAvailable) {
+      toast.error('Backend service is not available. Please make sure it\'s running.');
+      return {
+        text: "I can't process your request because the backend service is not available. Please ensure the FastAPI server is running on http://localhost:8000.",
+        citations: []
+      };
+    }
+    
     try {
+      console.log('Sending message to API:', userMessage);
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -63,11 +95,14 @@ const Index = () => {
         }),
       });
 
+      console.log('API response status:', response.status);
+      
       if (!response.ok) {
         throw new Error(`API request failed with status ${response.status}`);
       }
 
       const data = await response.json();
+      console.log('API response data:', data);
       return data;
     } catch (error) {
       console.error('Error sending message to API:', error);
@@ -101,6 +136,13 @@ const Index = () => {
       }]);
     } catch (error) {
       console.error('Error in handling message:', error);
+      
+      // Add an error message to the chat if something went wrong
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        content: "I'm sorry, there was an error processing your request. Please try again later.",
+        isUser: false
+      }]);
     } finally {
       setIsTyping(false);
     }
@@ -134,11 +176,19 @@ const Index = () => {
             
             <div className="text-center max-w-md mb-8">
               <h1 className="text-xl font-medium text-primary mb-3">
-                This is an <span className="underline">open source</span> chatbot template built with Next.js and the AI SDK by Vercel. It uses the <code className="bg-white/10 px-1 py-0.5 rounded text-xs">streamText</code> function in the server and the <code className="bg-white/10 px-1 py-0.5 rounded text-xs">useChat</code> hook on the client to create a seamless chat experience.
+                {isApiAvailable ? (
+                  "Ask me anything! I'm powered by a backend FastAPI service."
+                ) : (
+                  "⚠️ Backend service not available. Please start the FastAPI server."
+                )}
               </h1>
               
               <p className="text-sm text-chatbot-secondary mt-4">
-                You can learn more about the AI SDK by visiting the <span className="text-primary underline">docs</span>.
+                {isApiAvailable ? (
+                  "You can start by asking one of the suggested questions below, or type your own question."
+                ) : (
+                  "To use this chatbot, make sure the FastAPI backend is running on http://localhost:8000"
+                )}
               </p>
             </div>
             
