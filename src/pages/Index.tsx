@@ -1,5 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
+import { Triangle, MessageCircle } from 'lucide-react';
 import ChatHeader from '@/components/ChatHeader';
 import ChatMessage from '@/components/ChatMessage';
 import ChatInput from '@/components/ChatInput';
@@ -119,8 +120,7 @@ const Index = () => {
                   title={question.title}
                   subtitle={question.subtitle}
                   onClick={() => handleSuggestionClick(`${question.title} ${question.subtitle}`)}
-                  className="animate-fade-in"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  className={`animate-fade-in delay-${index * 100}`}
                 />
               ))}
             </div>
