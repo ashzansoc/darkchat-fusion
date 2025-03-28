@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
 import { MessageCircle, Triangle, ExternalLink } from 'lucide-react';
 
@@ -53,32 +54,37 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
         ) : (
           <div className="prose prose-invert max-w-none">
             <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
               components={{
-                // Custom components for markdown elements
-                p: ({ children }) => <p className="mb-4 leading-7">{children}</p>,
-                ul: ({ children }) => <ul className="mb-4 space-y-2">{children}</ul>,
-                ol: ({ children }) => <ol className="mb-4 space-y-2">{children}</ol>,
-                li: ({ children }) => <li className="ml-4">{children}</li>,
                 table: ({ children }) => (
-                  <div className="overflow-x-auto mb-4">
-                    <table className="min-w-full divide-y divide-gray-700">
+                  <div className="overflow-x-auto my-4">
+                    <table className="min-w-full border border-gray-700 bg-transparent">
                       {children}
                     </table>
                   </div>
                 ),
+                thead: ({ children }) => (
+                  <thead className="bg-gray-800/50">
+                    {children}
+                  </thead>
+                ),
                 th: ({ children }) => (
-                  <th className="px-4 py-2 bg-gray-800/50 text-left">{children}</th>
+                  <th className="px-4 py-2 border border-gray-700 text-left text-sm font-semibold">
+                    {children}
+                  </th>
                 ),
                 td: ({ children }) => (
-                  <td className="px-4 py-2 border-t border-gray-700">{children}</td>
-                ),
-                code: ({ children }) => (
-                  <code className="bg-gray-800/50 rounded px-1 py-0.5">{children}</code>
-                ),
-                pre: ({ children }) => (
-                  <pre className="bg-gray-800/50 p-4 rounded-lg overflow-x-auto mb-4">
+                  <td className="px-4 py-2 border border-gray-700 text-sm">
                     {children}
-                  </pre>
+                  </td>
+                ),
+                tr: ({ children }) => (
+                  <tr className="border-b border-gray-700 last:border-0">
+                    {children}
+                  </tr>
+                ),
+                p: ({ children }) => (
+                  <p className="mb-4 leading-7">{children}</p>
                 ),
               }}
             >

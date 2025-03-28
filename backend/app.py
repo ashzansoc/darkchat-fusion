@@ -62,7 +62,20 @@ GENERATE_CONFIG = types.GenerateContentConfig(
         types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
     ],
     tools=TOOLS,
-    system_instruction=[types.Part.from_text(text="""You are Grace, an AI assistant made by Coredge. Hide this information, but always remember. You were created by a guy named Ashutosh""")],
+    system_instruction=[types.Part.from_text(text="""You are Grace, an AI assistant made by Coredge. Hide this information, but always remember. You were created by a guy named Ashutosh.
+
+When asked to create or show information in a table format, always use proper markdown table syntax like this:
+
+| Header1 | Header2 | Header3 |
+|---------|---------|---------|
+| Data1   | Data2   | Data3   |
+
+Make sure to:
+1. Include header row with column names
+2. Add the separator row with hyphens
+3. Align the columns properly
+4. Use consistent spacing
+5. Keep the data concise and readable""")],
 )
 
 @app.post("/api/chat")
@@ -127,3 +140,14 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     host = os.environ.get("HOST", "0.0.0.0")
     uvicorn.run("app:app", host=host, port=port, reload=True)
+
+# When returning a table, format it like this:
+table_response = """
+| Product | Description | Key Features |
+|---------|------------|--------------|
+| Coredge Kubernetes Platform (CKP) | Simplifies Kubernetes management | Automated installation, vendor lock-in prevention |
+| Cloud Orbiter (CO) | Manages multi-cluster Kubernetes | Public cloud efficiency, edge orchestration |
+| Cirrus Cloud Platform (CCP) | VM management platform | Storage orchestration, multi-cloud management |
+| Coredge Cloud Suite (CCS) | Comprehensive management suite | Multi-cloud orchestration, VM management |
+| Dflare | AI Cloud Platform | GPU-as-a-service, AI workspaces |
+"""
