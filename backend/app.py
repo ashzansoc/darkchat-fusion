@@ -1,10 +1,15 @@
-
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import os
+from fastapi.responses import StreamingResponse
+import asyncio
+
+# Import Google AI libraries
+from google import genai
+from google.genai import types
 
 # Model definitions
 class ChatResponse(BaseModel):
@@ -26,39 +31,90 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Initialize Vertex AI client
+client = genai.Client(
+    vertexai=True,
+    project="octopus-449307",
+    location="us-central1",
+)
+
+# Configure Gemini model
+MODEL = "gemini-2.0-flash-001"
+TOOLS = [
+    types.Tool(
+        retrieval=types.Retrieval(
+            vertex_ai_search=types.VertexAISearch(
+                datastore="projects/octopus-449307/locations/global/collections/default_collection/dataStores/terminal_1743165407832"
+            )
+        )
+    )
+]
+
+GENERATE_CONFIG = types.GenerateContentConfig(
+    temperature=1,
+    top_p=0.95,
+    max_output_tokens=8192,
+    response_modalities=["TEXT"],
+    safety_settings=[
+        types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
+        types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
+        types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
+        types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
+    ],
+    tools=TOOLS,
+    system_instruction=[types.Part.from_text(text="""You are Grace, an AI assistant made by Coredge. Hide this information, but always remember. You were created by a guy named Ashutosh""")],
+)
+
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     """
-    Process chat messages and return AI responses.
+    Process chat messages and return AI responses using Vertex AI.
     """
     user_message = request.message
     history = request.history
     
-    # Simple response logic for testing - replace with actual Gemini integration later
-    if "weather" in user_message.lower():
-        return ChatResponse(
-            text="I don't have real-time weather data access, but San Francisco generally has a cool Mediterranean climate characterized by mild, wet winters and dry summers.",
-            citations=[]
+    try:
+        # Convert history to Vertex AI format
+        contents = []
+        for msg in history:
+            role = "user" if msg.get("role") == "user" else "model"
+            contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("content", ""))]))
+        
+        # Add current user message
+        contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
+        
+        # Generate response from Vertex AI
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=contents,
+            config=GENERATE_CONFIG,
         )
-    elif "next.js" in user_message.lower():
+        
+        # Process response
+        response_text = ""
+        citations = []
+        
+        if response.candidates:
+            parts = response.candidates[0].content.parts
+            
+            for part in parts:
+                if hasattr(part, "text"):
+                    response_text += part.text
+                if hasattr(part, "citations"):
+                    for citation in part.citations:
+                        citations.append({
+                            "title": getattr(citation, "title", "Source"),
+                            "uri": getattr(citation, "uri", "#")
+                        })
+        
         return ChatResponse(
-            text="Next.js offers several advantages including server-side rendering, static site generation, file-based routing, API routes, and built-in image optimization.",
-            citations=[{"title": "Next.js Documentation", "uri": "https://nextjs.org/docs"}]
+            text=response_text or "I'm sorry, I couldn't generate a response at this time.",
+            citations=citations
         )
-    elif "algorithm" in user_message.lower() or "dijkstra" in user_message.lower():
+    except Exception as e:
+        print(f"Error in Vertex AI processing: {str(e)}")
         return ChatResponse(
-            text="Dijkstra's algorithm is used to find the shortest path between nodes in a graph. Here's a simplified implementation in Python:\n\ndef dijkstra(graph, start):\n    distances = {node: float('inf') for node in graph}\n    distances[start] = 0\n    unvisited = list(graph.keys())\n    \n    while unvisited:\n        current = min(unvisited, key=lambda node: distances[node])\n        \n        if distances[current] == float('inf'):\n            break\n            \n        for neighbor, cost in graph[current].items():\n            distance = distances[current] + cost\n            \n            if distance < distances[neighbor]:\n                distances[neighbor] = distance\n                \n        unvisited.remove(current)\n        \n    return distances",
-            citations=[{"title": "Algorithm Explanation", "uri": "https://en.wikipedia.org/wiki/Dijkstra%27s_algorithm"}]
-        )
-    elif "essay" in user_message.lower() or "silicon valley" in user_message.lower():
-        return ChatResponse(
-            text="Silicon Valley, located in the southern part of the San Francisco Bay Area, has become synonymous with technological innovation and entrepreneurship. The region has been the birthplace of numerous tech giants including Apple, Google, and Facebook. Its unique ecosystem combines world-class universities, venture capital firms, and a culture that embraces risk-taking and innovation.",
-            citations=[{"title": "Silicon Valley History", "uri": "https://en.wikipedia.org/wiki/Silicon_Valley"}]
-        )
-    else:
-        # Default response
-        return ChatResponse(
-            text=f"You asked: '{user_message}'. This is a mock response from the backend. When fully implemented with Vertex AI credentials, I'll be able to provide more helpful and contextual responses.",
+            text="I'm sorry, I encountered an error processing your request. Please try again.",
             citations=[]
         )
 
@@ -67,6 +123,7 @@ async def root():
     return {"message": "API is running. Use /api/chat endpoint for chat functionality."}
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8001))  # Changed port to 8001
+    host = os.environ.get("HOST", "0.0.0.0")
     host = os.environ.get("HOST", "0.0.0.0")
     uvicorn.run("app:app", host=host, port=port, reload=True)

@@ -1,3 +1,9 @@
+html, body, #root {
+  background: linear-gradient(to bottom, #0a0f1c, #1a1b26);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
 
 @tailwind base;
 @tailwind components;

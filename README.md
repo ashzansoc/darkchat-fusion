@@ -92,3 +92,4 @@ If you see "Failed to get a response from the AI" error:
 
 - Frontend: React, TypeScript, Tailwind CSS
 - Backend: FastAPI, Python
+# answers
