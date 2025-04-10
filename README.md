@@ -1,56 +1,80 @@
+# Answers by Coredge
 
-# AI Chatbot Application
+A modern AI chatbot interface powered by FastAPI and React.
 
-This project consists of a React-based frontend chatbot UI and a Python FastAPI backend.
+## Prerequisites
+
+- Node.js (v16 or higher)
+- Python (v3.8 or higher)
+- npm (v8 or higher)
+
+## Frontend Dependencies
+
+Install the frontend dependencies:
+
+```bash
+npm install react
+npm install @tanstack/react-query
+npm install react-router-dom
+npm install react-markdown
+npm install remark-gfm
+npm install lucide-react
+npm install tailwindcss
+npm install sonner
+```
+
+## Backend Dependencies
+
+Create a Python virtual environment and install the backend dependencies:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+```
+
+Install required Python packages:
+
+```bash
+pip install fastapi
+pip install uvicorn
+pip install google-cloud-aiplatform
+pip install python-dotenv
+pip install google.generativeai
+pip install pydantic
+```
+
+## Environment Setup
+
+1. Create a `.env` file in the backend directory:
+
+```env
+GOOGLE_CLOUD_PROJECT=your-project-id
+GOOGLE_APPLICATION_CREDENTIALS=path/to/your/credentials.json
+```
+
+2. Configure your Google Cloud credentials for Vertex AI
+
+## Running the Application
+
+1. Start the backend server:
+
+```bash
+cd backend
+uvicorn app:app --reload --port 8001
+```
+
+2. Start the frontend development server:
+
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173`
 
 ## Project Structure
 
 - `src/` - Frontend React application
 - `backend/` - Backend FastAPI application
-
-## Setup and Running
-
-### Frontend
-
-1. Install dependencies:
-   ```
-   npm install
-   ```
-
-2. Start the development server:
-   ```
-   npm run dev
-   ```
-
-3. Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-### Backend
-
-1. Navigate to the backend directory:
-   ```
-   cd backend
-   ```
-
-2. Create a virtual environment:
-   ```
-   python -m venv venv
-   ```
-
-3. Activate the virtual environment:
-   - On Windows: `venv\Scripts\activate`
-   - On macOS/Linux: `source venv/bin/activate`
-
-4. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
-
-5. Run the backend server:
-   ```
-   python app.py
-   ```
-
-   The API will be available at [http://localhost:8000](http://localhost:8000)
 
 ## Important Notes
 
@@ -92,4 +116,3 @@ If you see "Failed to get a response from the AI" error:
 
 - Frontend: React, TypeScript, Tailwind CSS
 - Backend: FastAPI, Python
-# answers
