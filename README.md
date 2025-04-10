@@ -1,6 +1,102 @@
-# Answers by Coredge
+# DarkChat Fusion
 
-A modern AI chatbot interface powered by FastAPI and React.
+An AI-powered chat application using Google's Gemini AI model with FastAPI backend and React frontend.
+
+## Docker Deployment
+
+This application is containerized with Docker for easy deployment. Follow these steps to run it:
+
+### Prerequisites
+
+- Docker and Docker Compose installed on your VM
+- Proper Google Cloud credentials configured for Vertex AI
+
+### Deployment Steps
+
+1. Clone this repository to your VM:
+   ```bash
+   git clone <repository-url>
+   cd darkchat-fusion
+   ```
+
+2. Set up Google Cloud authentication (if not already done):
+   ```bash
+   # Make the script executable
+   chmod +x backend/setup_cloud_auth.sh
+   # Run the authentication script
+   ./backend/setup_cloud_auth.sh
+   ```
+
+3. Build and start the containers:
+   ```bash
+   docker-compose up -d
+   ```
+
+   This will:
+   - Build the backend FastAPI container
+   - Build the frontend React container
+   - Start both services
+
+4. Access the application:
+   - The application will be available at `http://<your-vm-ip>/`
+   - The API will be available at `http://<your-vm-ip>/api/`
+
+### Configuration
+
+- Backend configuration: Edit `backend/app.py` if you need to customize AI behavior or endpoints
+- Google Cloud credentials: Ensure your VM has proper permissions for Google Cloud and Vertex AI
+
+### Stopping the Application
+
+```bash
+docker-compose down
+```
+
+### Updates
+
+To update after code changes:
+
+```bash
+git pull
+docker-compose up -d --build
+```
+
+This will rebuild the containers with the latest code changes.
+
+## Troubleshooting
+
+### Google Cloud Authentication Issues
+
+If you encounter authentication issues with Google Cloud:
+
+1. Run the authentication setup script:
+   ```bash
+   ./backend/setup_cloud_auth.sh
+   ```
+
+2. Restart the containers:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+### Container Logs
+
+To check container logs for issues:
+
+```bash
+# Check backend logs
+docker logs darkchat-backend
+
+# Check frontend logs
+docker logs darkchat-frontend
+```
+
+## Security Notes
+
+- For production use, consider adding authentication
+- Set appropriate CORS settings in `backend/app.py`
+- Update environment variables in docker-compose.yml for production settings
 
 ## Prerequisites
 
@@ -94,15 +190,6 @@ To implement the actual Gemini AI with Vertex AI:
 2. Set up a Google Cloud project and enable the Vertex AI API
 3. Set up authentication with a service account key
 4. Update the code in `backend/app.py` to use the actual Vertex AI client
-
-## Troubleshooting
-
-If you see "Failed to get a response from the AI" error:
-
-1. Make sure the backend server is running at http://localhost:8000
-2. Check if there are any error messages in the backend console
-3. Verify network connectivity between frontend and backend
-4. If using a virtual environment, ensure all required packages are installed
 
 ## Features
 
