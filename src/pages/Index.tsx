@@ -33,7 +33,16 @@ const suggestedQuestions = [
 ];
 
 // API configuration
-const API_URL = "http://localhost:8000/api/chat";
+// Determine API URL based on environment
+// In development, use absolute URL, in production (Docker/deployment) use relative URL
+const isProduction = window.location.hostname !== 'localhost';
+const API_URL = isProduction 
+  ? "/api/chat"  // In production with nginx: relative path
+  : "http://localhost:8000/api/chat";  // In development: absolute path with port
+
+const HEALTH_URL = isProduction
+  ? "/health"  // In production with nginx: relative path
+  : "http://localhost:8000/";  // In development: absolute path with port
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -47,7 +56,8 @@ const Index = () => {
   useEffect(() => {
     const checkApiStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8000/');
+        console.log('Checking API health at:', HEALTH_URL);
+        const response = await fetch(HEALTH_URL);
         if (response.ok) {
           setIsApiAvailable(true);
           console.log('Backend API is available');
@@ -58,7 +68,7 @@ const Index = () => {
       } catch (error) {
         console.error('Backend API check failed:', error);
         setIsApiAvailable(false);
-        toast.error('Cannot connect to backend service. Make sure it\'s running on http://localhost:8000');
+        toast.error('Cannot connect to backend service');
       }
     };
     
@@ -74,7 +84,7 @@ const Index = () => {
     if (!isApiAvailable) {
       toast.error('Backend service is not available. Please make sure it\'s running.');
       return {
-        text: "I can't process your request because the backend service is not available. Please ensure the FastAPI server is running on http://localhost:8000.",
+        text: "I can't process your request because the backend service is not available. Please ensure the server is running.",
         citations: []
       };
     }
@@ -209,7 +219,7 @@ const Index = () => {
                   {isApiAvailable ? (
                     "I am Answers by Coredge.I can help you with your questions."
                   ) : (
-                    "⚠️ Backend service not available. Please start the FastAPI server."
+                    "⚠️ Backend service not available. Please make sure the server is running."
                   )}
                 </h1>
                 
@@ -217,7 +227,7 @@ const Index = () => {
                   {isApiAvailable ? (
                     "I have been developed by a team of experts at Coredge. You have questions, I have answers."
                   ) : (
-                    "To use this chatbot, make sure the FastAPI backend is running on http://localhost:8000"
+                    "To use this chatbot, make sure the backend service is running"
                   )}
                 </p>
               </div>
