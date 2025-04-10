@@ -33,7 +33,7 @@ const suggestedQuestions = [
 ];
 
 // API configuration
-const API_URL = "http://localhost:8001/api/chat";
+const API_URL = "http://localhost:8000/api/chat";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -47,7 +47,7 @@ const Index = () => {
   useEffect(() => {
     const checkApiStatus = async () => {
       try {
-        const response = await fetch('http://localhost:8001/');
+        const response = await fetch('http://localhost:8000/');
         if (response.ok) {
           setIsApiAvailable(true);
           console.log('Backend API is available');
@@ -58,7 +58,7 @@ const Index = () => {
       } catch (error) {
         console.error('Backend API check failed:', error);
         setIsApiAvailable(false);
-        toast.error('Cannot connect to backend service. Make sure it\'s running on http://localhost:8001');
+        toast.error('Cannot connect to backend service. Make sure it\'s running on http://localhost:8000');
       }
     };
     
@@ -74,24 +74,33 @@ const Index = () => {
     if (!isApiAvailable) {
       toast.error('Backend service is not available. Please make sure it\'s running.');
       return {
-        text: "I can't process your request because the backend service is not available. Please ensure the FastAPI server is running on http://localhost:8001.",
+        text: "I can't process your request because the backend service is not available. Please ensure the FastAPI server is running on http://localhost:8000.",
         citations: []
       };
     }
     
     try {
       console.log('Sending message to API:', userMessage);
+      
+      // Format the messages as required by our FastAPI endpoint
+      const formattedMessages = messages.map(msg => ({
+        role: msg.isUser ? 'user' : 'assistant',
+        content: msg.content
+      }));
+      
+      // Add the current message to the conversation
+      formattedMessages.push({
+        role: 'user',
+        content: userMessage
+      });
+      
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: userMessage,
-          history: messages.map(msg => ({
-            role: msg.isUser ? 'user' : 'assistant',
-            content: msg.content
-          }))
+          messages: formattedMessages
         }),
       });
 
@@ -103,7 +112,12 @@ const Index = () => {
 
       const data = await response.json();
       console.log('API response data:', data);
-      return data;
+      
+      // Return the response with citations if available
+      return {
+        text: data.response,
+        citations: data.citations || []
+      };
     } catch (error) {
       console.error('Error sending message to API:', error);
       toast.error('Failed to get a response from the AI. Please try again.');
@@ -203,7 +217,7 @@ const Index = () => {
                   {isApiAvailable ? (
                     "I have been developed by a team of experts at Coredge. You have questions, I have answers."
                   ) : (
-                    "To use this chatbot, make sure the FastAPI backend is running on http://localhost:8001"
+                    "To use this chatbot, make sure the FastAPI backend is running on http://localhost:8000"
                   )}
                 </p>
               </div>

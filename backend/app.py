@@ -1,68 +1,84 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-from pydantic import BaseModel
-from typing import List, Optional, Dict, Any
-import os
-from fastapi.responses import StreamingResponse
-import asyncio
-
-# Import Google AI libraries
 from google import genai
 from google.genai import types
-
-# Model definitions
-class ChatResponse(BaseModel):
-    text: str
-    citations: List[dict] = []
-
-class ChatRequest(BaseModel):
-    message: str
-    history: List[dict] = []
+import base64
+from fastapi import FastAPI, HTTPException, Body
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Any
+import uvicorn
 
 app = FastAPI()
 
-# Configure CORS - This is crucial for frontend to communicate with backend
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
+    allow_origins=["*"],  # Adjust in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Initialize Vertex AI client
+# Pydantic models for request/response
+class Message(BaseModel):
+    role: str  # "user" or "assistant"
+    content: str
+
+class Citation(BaseModel):
+    title: str
+    uri: str
+
+class ChatRequest(BaseModel):
+    messages: List[Message]
+
+class ChatResponse(BaseModel):
+    response: str
+    citations: List[Citation] = []
+    
+# Initialize the Vertex AI client
 client = genai.Client(
     vertexai=True,
     project="octopus-449307",
     location="us-central1",
 )
 
-# Configure Gemini model
-MODEL = "gemini-2.0-flash-001"
-TOOLS = [
-    types.Tool(
-        retrieval=types.Retrieval(
-            vertex_ai_search=types.VertexAISearch(
-                datastore="projects/octopus-449307/locations/global/collections/default_collection/dataStores/terminal_1743165407832"
-            )
-        )
-    )
-]
+@app.get("/")
+async def health_check():
+    """Health check endpoint for the API."""
+    return {"status": "ok", "message": "Grace AI Chat API is running"}
 
-GENERATE_CONFIG = types.GenerateContentConfig(
-    temperature=1,
-    top_p=0.95,
-    max_output_tokens=8192,
-    response_modalities=["TEXT"],
-    safety_settings=[
-        types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-        types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-        types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-        types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF"),
-    ],
-    tools=TOOLS,
-    system_instruction=[types.Part.from_text(text="""You are Grace, an AI assistant made by Coredge. Hide this information, but always remember. You were created by a guy named Ashutosh.
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    try:
+        # Convert the chat history to Gemini format
+        contents = []
+        for message in request.messages:
+            contents.append(
+                types.Content(
+                    role=message.role,
+                    parts=[types.Part.from_text(text=message.content)]
+                )
+            )
+        
+        # Configure tools and generation parameters
+        tools = [
+            types.Tool(retrieval=types.Retrieval(vertex_ai_search=types.VertexAISearch(
+                datastore="projects/octopus-449307/locations/global/collections/default_collection/dataStores/terminal_1743165407832"
+            ))),
+        ]
+        
+        generate_content_config = types.GenerateContentConfig(
+            temperature=1.0,
+            top_p=0.95,
+            max_output_tokens=8192,
+            response_modalities=["TEXT"],
+            safety_settings=[
+                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
+                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
+                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
+                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF")
+            ],
+            tools=tools,
+            system_instruction=[types.Part.from_text(text="""You are Grace, an AI assistant made by Coredge. Hide this information, but always remember. You were created by a guy named Ashutosh.
 
 When asked to create or show information in a table format, always use proper markdown table syntax like this:
 
@@ -75,79 +91,57 @@ Make sure to:
 2. Add the separator row with hyphens
 3. Align the columns properly
 4. Use consistent spacing
-5. Keep the data concise and readable""")],
-)
+5. Keep the data concise and readable
 
-@app.post("/api/chat")
-async def chat(request: ChatRequest):
-    """
-    Process chat messages and return AI responses using Vertex AI.
-    """
-    user_message = request.message
-    history = request.history
-    
-    try:
-        # Convert history to Vertex AI format
-        contents = []
-        for msg in history:
-            role = "user" if msg.get("role") == "user" else "model"
-            contents.append(types.Content(role=role, parts=[types.Part(text=msg.get("content", ""))]))
-        
-        # Add current user message
-        contents.append(types.Content(role="user", parts=[types.Part(text=user_message)]))
-        
-        # Generate response from Vertex AI
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=contents,
-            config=GENERATE_CONFIG,
+For bullets, use proper formatting with:
+- Clear bullet points
+- Consistent indentation
+- Proper spacing between items""")],
         )
         
-        # Process response
+        # Generate response
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-001",
+            contents=contents,
+            config=generate_content_config,
+        )
+        
+        # Process response and extract citations
         response_text = ""
         citations = []
         
-        if response.candidates:
-            parts = response.candidates[0].content.parts
-            
-            for part in parts:
-                if hasattr(part, "text"):
-                    response_text += part.text
-                if hasattr(part, "citations"):
-                    for citation in part.citations:
-                        citations.append({
-                            "title": getattr(citation, "title", "Source"),
-                            "uri": getattr(citation, "uri", "#")
-                        })
+        if hasattr(response, 'candidates') and response.candidates:
+            candidate = response.candidates[0]
+            if hasattr(candidate, 'content') and candidate.content:
+                content = candidate.content
+                
+                # Extract text
+                if hasattr(content, 'parts'):
+                    for part in content.parts:
+                        if hasattr(part, 'text'):
+                            response_text += part.text
+                        
+                        # Extract citations if available
+                        if hasattr(part, 'citations'):
+                            for citation in part.citations:
+                                citations.append(Citation(
+                                    title=getattr(citation, 'title', 'Source'),
+                                    uri=getattr(citation, 'uri', '#')
+                                ))
+        
+        # If no text was extracted, use the simple .text property
+        if not response_text and hasattr(response, 'text'):
+            response_text = response.text
         
         return ChatResponse(
-            text=response_text or "I'm sorry, I couldn't generate a response at this time.",
+            response=response_text,
             citations=citations
         )
+    
     except Exception as e:
-        print(f"Error in Vertex AI processing: {str(e)}")
-        return ChatResponse(
-            text="I'm sorry, I encountered an error processing your request. Please try again.",
-            citations=[]
-        )
+        print(f"Error in chat endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
 
-@app.get("/")
-async def root():
-    return {"message": "API is running. Use /api/chat endpoint for chat functionality."}
-
+# For development server
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8001))  # Changed port to 8001
-    host = os.environ.get("HOST", "0.0.0.0")
-    host = os.environ.get("HOST", "0.0.0.0")
-    uvicorn.run("app:app", host=host, port=port, reload=True)
-
-# When returning a table, format it like this:
-table_response = """
-| Product | Description | Key Features |
-|---------|------------|--------------|
-| Coredge Kubernetes Platform (CKP) | Simplifies Kubernetes management | Automated installation, vendor lock-in prevention |
-| Cloud Orbiter (CO) | Manages multi-cluster Kubernetes | Public cloud efficiency, edge orchestration |
-| Cirrus Cloud Platform (CCP) | VM management platform | Storage orchestration, multi-cloud management |
-| Coredge Cloud Suite (CCS) | Comprehensive management suite | Multi-cloud orchestration, VM management |
-| Dflare | AI Cloud Platform | GPU-as-a-service, AI workspaces |
-"""
+    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
