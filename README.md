@@ -203,3 +203,21 @@ To implement the actual Gemini AI with Vertex AI:
 
 - Frontend: React, TypeScript, Tailwind CSS
 - Backend: FastAPI, Python
+
+## Deployment Information
+
+The application is now deployed with:
+- Backend API running on VM: http://34.45.129.121:8000/
+- The frontend chatbot communicates with the backend at `http://34.45.129.121:8000/api/chat`
+
+### Local Development
+
+For local development, you can still run:
+```bash
+# Backend
+cd backend
+python app.py
+
+# Frontend
+npm run dev
+```

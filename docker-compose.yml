@@ -1,4 +1,4 @@
-version: '3.8'
+version: '3.3'
 
 services:
   # Backend service
@@ -18,11 +18,10 @@ services:
       - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-octopus-449307}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      test: python -c "import urllib.request; urllib.request.urlopen('http://34.45.129.121:8000/')"
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
 
   # Frontend service
   frontend:
@@ -33,15 +32,10 @@ services:
     ports:
       - "80:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      test: wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
       interval: 30s
       timeout: 10s
-      retries: 3
-
-networks:
-  app-network:
-    driver: bridge 
+      retries: 3 

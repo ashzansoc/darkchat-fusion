@@ -9,6 +9,7 @@ import uvicorn
 import logging
 import sys
 import traceback
+import os
 
 # Set up logging
 logging.basicConfig(
@@ -48,10 +49,17 @@ class ChatResponse(BaseModel):
 # Initialize the Vertex AI client
 try:
     logger.info("Attempting to initialize Google AI client...")
+    
+    # Get project and location from environment or use defaults
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT", "octopus-449307")
+    location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+    
+    logger.info(f"Using project: {project_id}, location: {location}")
+    
     client = genai.Client(
         vertexai=True,
-        project="octopus-449307",
-        location="us-central1",
+        project=project_id,
+        location=location,
     )
     logger.info("Google AI client initialized successfully")
 except Exception as e:
@@ -87,20 +95,28 @@ async def chat(request: ChatRequest):
         # Convert the chat history to Gemini format
         contents = []
         for message in request.messages:
+            logger.info(f"Adding message with role: {message.role}, content: {message.content[:50]}...")
             contents.append(
                 types.Content(
                     role=message.role,
                     parts=[types.Part.from_text(text=message.content)]
                 )
             )
-            logger.debug(f"Message added to contents: {message.role} - {message.content[:50]}...")
         
         # Configure tools and generation parameters
-        tools = [
-            types.Tool(retrieval=types.Retrieval(vertex_ai_search=types.VertexAISearch(
-                datastore="projects/octopus-449307/locations/global/collections/default_collection/dataStores/terminal_1743165407832"
-            ))),
-        ]
+        tools = []  # Simplified - remove tools if they're causing issues
+        
+        # If needed, re-add tools with proper error handling:
+        try:
+            tools = [
+                types.Tool(retrieval=types.Retrieval(vertex_ai_search=types.VertexAISearch(
+                    datastore="projects/octopus-449307/locations/global/collections/default_collection/dataStores/terminal_1743165407832"
+                ))),
+            ]
+            logger.info("Tools configured successfully")
+        except Exception as tool_error:
+            logger.error(f"Error configuring tools: {str(tool_error)}")
+            logger.error("Continuing without tools")
         
         generate_content_config = types.GenerateContentConfig(
             temperature=1.0,
@@ -137,41 +153,69 @@ For bullets, use proper formatting with:
         
         # Generate response
         logger.info("Sending request to Gemini AI...")
-        response = client.models.generate_content(
-            model="gemini-2.0-flash-001",
-            contents=contents,
-            config=generate_content_config,
-        )
-        logger.info("Received response from Gemini AI")
+        
+        # Try a simplified config first if the full config causes errors
+        try:
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-001",
+                contents=contents,
+                config=generate_content_config,
+            )
+            logger.info("Received response from Gemini AI with full config")
+        except Exception as config_error:
+            logger.error(f"Error with full config: {str(config_error)}")
+            logger.info("Trying simplified config...")
+            
+            # Try with a simplified config
+            simplified_config = types.GenerationConfig(
+                temperature=0.7,
+                max_output_tokens=2048,
+            )
+            
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-001",
+                contents=contents,
+                generation_config=simplified_config
+            )
+            logger.info("Received response with simplified config")
         
         # Process response and extract citations
         response_text = ""
         citations = []
         
-        if hasattr(response, 'candidates') and response.candidates:
-            candidate = response.candidates[0]
-            if hasattr(candidate, 'content') and candidate.content:
-                content = candidate.content
-                
-                # Extract text
-                if hasattr(content, 'parts'):
-                    for part in content.parts:
-                        if hasattr(part, 'text'):
-                            response_text += part.text
-                        
-                        # Extract citations if available
-                        if hasattr(part, 'citations'):
-                            for citation in part.citations:
-                                citations.append(Citation(
-                                    title=getattr(citation, 'title', 'Source'),
-                                    uri=getattr(citation, 'uri', '#')
-                                ))
+        # Detailed response processing with error handling
+        try:
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    content = candidate.content
+                    
+                    # Extract text
+                    if hasattr(content, 'parts'):
+                        for part in content.parts:
+                            if hasattr(part, 'text'):
+                                response_text += part.text
+                            
+                            # Extract citations if available
+                            if hasattr(part, 'citations'):
+                                for citation in part.citations:
+                                    citations.append(Citation(
+                                        title=getattr(citation, 'title', 'Source'),
+                                        uri=getattr(citation, 'uri', '#')
+                                    ))
+        except Exception as processing_error:
+            logger.error(f"Error processing response: {str(processing_error)}")
         
         # If no text was extracted, use the simple .text property
         if not response_text and hasattr(response, 'text'):
             response_text = response.text
             
+        if not response_text:
+            # Final fallback if we still don't have a response
+            response_text = "I'm sorry, I couldn't generate a proper response at this time."
+            
         logger.info(f"Returning response with {len(citations)} citations")
+        logger.info(f"Response text (first 100 chars): {response_text[:100]}...")
         
         return ChatResponse(
             response=response_text,
@@ -182,7 +226,16 @@ For bullets, use proper formatting with:
         error_traceback = traceback.format_exc()
         logger.error(f"Error in chat endpoint: {str(e)}")
         logger.error(f"Traceback: {error_traceback}")
-        raise HTTPException(status_code=500, detail=f"Error generating response: {str(e)}")
+        
+        # Return a more specific error message
+        error_message = f"Error generating response: {str(e)}"
+        logger.error(error_message)
+        
+        # Provide a fallback response for users
+        return ChatResponse(
+            response="I apologize, but I encountered an error while processing your request. The system might be experiencing technical difficulties. Please try again later or contact support if the problem persists.",
+            citations=[]
+        )
 
 @app.get("/test-auth")
 async def test_auth():
@@ -224,7 +277,36 @@ async def test_auth():
             "error": str(e)
         }
 
+@app.get("/simplified-chat")
+async def simplified_chat(message: str = "Hello"):
+    """Simplified chat endpoint for testing."""
+    try:
+        logger.info(f"Simplified chat request received with message: {message}")
+        
+        if client is None:
+            return {"status": "error", "message": "Google AI client is not initialized"}
+        
+        # Use the most basic possible configuration
+        response = client.models.generate_content(
+            model="gemini-2.0-flash-001",
+            contents=[types.Content(
+                role="user",
+                parts=[types.Part.from_text(text=message)]
+            )]
+        )
+        
+        if hasattr(response, 'text'):
+            return {"status": "success", "response": response.text}
+        else:
+            return {"status": "error", "message": "No response text returned"}
+            
+    except Exception as e:
+        logger.error(f"Error in simplified chat: {str(e)}")
+        return {"status": "error", "message": str(e)}
+
 # For development server
 if __name__ == "__main__":
-    logger.info("Starting FastAPI server...")
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    logger.info(f"Starting FastAPI server on {host}:{port}")
+    uvicorn.run("app:app", host=host, port=port, reload=True) 
