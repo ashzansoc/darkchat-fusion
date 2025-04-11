@@ -33,16 +33,9 @@ const suggestedQuestions = [
 ];
 
 // API configuration
-// Determine API URL based on environment
-// In development, use absolute URL, in production (Docker/deployment) use relative URL
-const isProduction = window.location.hostname !== 'localhost';
-const API_URL = isProduction 
-  ? "/api/chat"  // In production with nginx: relative path
-  : "http://localhost:8000/api/chat";  // In development: absolute path with port
-
-const HEALTH_URL = isProduction
-  ? "/health"  // In production with nginx: relative path
-  : "http://localhost:8000/";  // In development: absolute path with port
+// Use the VM's API endpoint
+const API_URL = "http://34.45.129.121:8000/api/chat";
+const HEALTH_URL = "http://34.45.129.121:8000/";
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -91,6 +84,7 @@ const Index = () => {
     
     try {
       console.log('Sending message to API:', userMessage);
+      console.log('API URL:', API_URL);
       
       // Format the messages as required by our FastAPI endpoint
       const formattedMessages = messages.map(msg => ({
@@ -104,6 +98,9 @@ const Index = () => {
         content: userMessage
       });
       
+      // Show a more specific loading toast to indicate API call is in progress
+      toast.info('Waiting for AI response...');
+      
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: {
@@ -116,7 +113,25 @@ const Index = () => {
 
       console.log('API response status:', response.status);
       
+      // If API returns error status but has a specific response, we might be able to use it
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API error details:', errorText);
+        
+        try {
+          // Try to parse the error response as it might contain a user-friendly message
+          const errorData = JSON.parse(errorText);
+          if (errorData && errorData.response) {
+            // If API provides an error with a response field, use that
+            return {
+              text: errorData.response,
+              citations: []
+            };
+          }
+        } catch (parseError) {
+          // If parsing fails, just continue to throw the original error
+        }
+        
         throw new Error(`API request failed with status ${response.status}`);
       }
 
@@ -130,9 +145,30 @@ const Index = () => {
       };
     } catch (error) {
       console.error('Error sending message to API:', error);
-      toast.error('Failed to get a response from the AI. Please try again.');
+      toast.error('Failed to get a response from the AI.');
+      
+      // Try a direct fallback to simplified chat if the main endpoint failed
+      try {
+        console.log('Trying simplified fallback endpoint...');
+        const fallbackUrl = `http://34.45.129.121:8000/simplified-chat?message=${encodeURIComponent(userMessage)}`;
+        const fallbackResponse = await fetch(fallbackUrl);
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          if (fallbackData.status === 'success' && fallbackData.response) {
+            return {
+              text: fallbackData.response,
+              citations: []
+            };
+          }
+        }
+      } catch (fallbackError) {
+        console.error('Fallback also failed:', fallbackError);
+      }
+      
+      // If all attempts fail, return a generic error message
       return {
-        text: "I'm sorry, I encountered an error processing your request. The backend service might be unavailable.",
+        text: "I'm sorry, but I'm having trouble connecting to my knowledge source right now. Please try again in a moment.",
         citations: []
       };
     }
